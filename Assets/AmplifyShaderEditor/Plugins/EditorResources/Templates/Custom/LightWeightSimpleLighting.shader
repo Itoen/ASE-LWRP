@@ -45,11 +45,9 @@ Shader /*ase_name*/ "Custom/LightWeightSimpleLighting" /*end*/
          /*ase_pragma*/
 
          // Lighting include is needed because of GI
-         #include "LWRP/ShaderLibrary/Core.hlsl"
-         #include "LWRP/ShaderLibrary/Lighting.hlsl"
-         #include "CoreRP/ShaderLibrary/Color.hlsl"
-         #include "LWRP/ShaderLibrary/InputSurfaceUnlit.hlsl"
-         #include "ShaderGraphLibrary/Functions.hlsl"
+         #include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Core.hlsl"
+         #include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Lighting.hlsl"
+         #include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Color.hlsl"
          
          /*ase_globals*/
                  
@@ -121,16 +119,16 @@ Shader /*ase_name*/ "Custom/LightWeightSimpleLighting" /*end*/
      #if SHADER_HINT_NICE_QUALITY
              WorldSpaceNormal = normalize ( WorldSpaceNormal );
      #endif
-             
-             half attenuation = MainLightRealtimeShadowAttenuation(IN.shadowCoord);
+
+             Light mainLight = GetMainLight(IN.shadowCoord);
+             half attenuation = mainLight.shadowAttenuation;
 
      #ifdef _ADDITIONAL_LIGHTS
              int pixelLightCount = GetPixelLightCount();
              for (int i = 0; i < pixelLightCount; ++i)
              {
                 Light light = GetLight(i, WorldSpacePosition);
-                light.attenuation *= LocalLightRealtimeShadowAttenuation(light.index, WorldSpacePosition);
-                attenuation *= light.attenuation;
+                attenuation *= light.shadowAttenuation;
              }
      #endif
 
@@ -144,7 +142,92 @@ Shader /*ase_name*/ "Custom/LightWeightSimpleLighting" /*end*/
          ENDHLSL
      }
 
-        UsePass "LightweightPipeline/Standard (Simple Lighting)/ShadowCaster"
+     /*ase_pass*/
+     Pass
+     {
+         /*ase_hide_pass*/
+         Name "ShadowCaster"
+         Tags{"LightMode" = "ShadowCaster"}
+
+         ZWrite On
+         ZTest LEqual
+
+         HLSLPROGRAM
+         #pragma prefer_hlslcc gles
+        
+         #pragma multi_compile_instancing
+        
+         #pragma vertex vert
+         #pragma fragment frag
+        
+         #include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Core.hlsl"
+         #include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Lighting.hlsl"
+         /*ase_pragma*/
+         uniform float4 _ShadowBias;
+         uniform float3 _LightDirection;
+         /*ase_globals*/
+                    
+         struct GraphVertexInput
+         {
+             float4 vertex : POSITION;
+             float3 ase_normal : NORMAL;
+             /*ase_vdata:p=p;n=n*/
+             UNITY_VERTEX_INPUT_INSTANCE_ID
+         };
+
+         struct GraphVertexOutput
+         {
+             float4 clipPos : SV_POSITION;
+             /*ase_interp(7,):sp=sp.xyzw;*/
+             UNITY_VERTEX_INPUT_INSTANCE_ID
+         };
+
+         GraphVertexOutput vert (GraphVertexInput v/*ase_vert_input*/)
+         {
+             GraphVertexOutput o;
+             UNITY_SETUP_INSTANCE_ID(v);
+             UNITY_TRANSFER_INSTANCE_ID(v, o);
+
+             /*ase_vert_code:v=GraphVertexInput;o=GraphVertexOutput*/
+
+             v.vertex.xyz += /*ase_vert_out:Vertex Offset;Float3;2;-1;_Vertex*/ float3(0,0,0) /*end*/;
+             v.ase_normal = /*ase_vert_out:Vertex Normal;Float3;3;-1;_Normal*/ v.ase_normal /*end*/;
+
+             float3 positionWS = TransformObjectToWorld(v.vertex.xyz);
+             float3 normalWS = TransformObjectToWorldDir(v.ase_normal);
+
+             float invNdotL = 1.0 - saturate(dot(_LightDirection, normalWS));
+             float scale = invNdotL * _ShadowBias.y;
+
+             positionWS = normalWS * scale.xxx + positionWS;
+             float4 clipPos = TransformWorldToHClip(positionWS);
+
+             clipPos.z += _ShadowBias.x;
+             #if UNITY_REVERSED_Z
+                 clipPos.z = min(clipPos.z, clipPos.w * UNITY_NEAR_CLIP_VALUE);
+             #else
+                 clipPos.z = max(clipPos.z, clipPos.w * UNITY_NEAR_CLIP_VALUE);
+             #endif
+             o.clipPos = clipPos;
+             return o;
+         }
+        
+         half4 frag (GraphVertexOutput IN /*ase_frag_input*/) : SV_Target
+         {
+             UNITY_SETUP_INSTANCE_ID(IN);
+
+             /*ase_frag_code:IN=GraphVertexOutput*/
+
+             float Alpha = /*ase_frag_out:Alpha;Float;0;-1;_Alpha*/1/*end*/;
+             float AlphaClipThreshold = /*ase_frag_out:Alpha Clip Threshold;Float;1;-1;_AlphaClip*/AlphaClipThreshold/*end*/;
+                
+             #if _AlphaClip
+                 clip(Alpha - AlphaClipThreshold);
+             #endif
+             return Alpha;
+         }
+         ENDHLSL
+     }
      
      Pass
      {
@@ -163,7 +246,7 @@ Shader /*ase_name*/ "Custom/LightWeightSimpleLighting" /*end*/
          #pragma vertex vert
          #pragma fragment frag
 
-         #include "LWRP/ShaderLibrary/Core.hlsl"
+         #include "Packages/com.unity.render-pipelines.lightweight/ShaderLibrary/Core.hlsl"
          /*ase_pragma*/
          /*ase_globals*/
 
