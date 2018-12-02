@@ -127,7 +127,7 @@ Shader /*ase_name*/ "Custom/LightWeightSimpleLighting" /*end*/
              int pixelLightCount = GetPixelLightCount();
              for (int i = 0; i < pixelLightCount; ++i)
              {
-                Light light = GetLight(i, WorldSpacePosition);
+                Light light = GetAdditionalLight(i, WorldSpacePosition);
                 attenuation *= light.shadowAttenuation;
              }
      #endif
