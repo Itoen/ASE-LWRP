@@ -9,3 +9,7 @@ Amplify Shader Editor Window
 Output Node Option -> Common Properties -> Shader Type -> Custom/LightWeightSimpleLighting  
 <img width="518" alt="2018-10-04 23 18 25" src="https://user-images.githubusercontent.com/17733911/46480279-dd7e7000-c82b-11e8-9315-793c1284b61a.png">
 
+## Release
+[Release Page](https://github.com/Itoen/ASE-LWRP/releases)  
+## License
+[MIT](https://github.com/Itoen/ASE-LWRP/blob/master/LICENSE)
